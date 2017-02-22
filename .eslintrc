@@ -1,0 +1,22 @@
+{
+  "plugins": [ ],
+  "parser": "babel-eslint",
+  "parserOptions": {
+    "ecmaVersion": 7,
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "modules": true,
+      "classes": true
+    }
+  },
+  "env": {
+    "es6": true,
+    "shared-node-browser": true,
+  },
+  "extends": "eslint-config-airbnb",
+  "rules": {
+    "comma-dangle": 0,
+    "max-len": [2, 200, 2],
+    "new-cap": ["error", {"capIsNew": false}]
+  }
+}
