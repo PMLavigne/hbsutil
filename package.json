@@ -2,7 +2,7 @@
   "name": "hbsutil",
   "version": "0.0.1",
   "description": "Small command line utility for build-time processing of handlebars templates",
-  "main": "handlebars.js",
+  "main": "hbsutil.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -15,7 +15,6 @@
     "hbs",
     "cli",
     "command",
-    "line",
     "template"
   ],
   "author": "Patrick Lavigne <me@patrick.codes> (https://github.com/PMLavigne)",
@@ -23,5 +22,10 @@
   "bugs": {
     "url": "https://github.com/PMLavigne/hbsutil/issues"
   },
-  "homepage": "https://github.com/PMLavigne/hbsutil#readme"
+  "homepage": "https://github.com/PMLavigne/hbsutil#readme",
+  "dependencies": {
+    "commander": "^2.9.0",
+    "handlebars": "^4.0.6",
+    "mz": "^2.6.0"
+  }
 }

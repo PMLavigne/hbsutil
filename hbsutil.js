@@ -1,20 +1,22 @@
-#! /usr/bin/env node --harmony
+#! /usr/bin/env node
 /* eslint-disable no-param-reassign */
 
-import hbs from 'handlebars';
-import fs from 'mz/fs';
-import program from 'commander';
-import packageJson from '../package.json';
 
-program.version(packageJson.version)
-    .description('Handlebars wrapper script for templating during build')
-    .arguments('<template...>')
+var hbs         = require('handlebars');
+var fs          = require('mz/fs');
+var program     = require('commander');
+var packageJson = require('./package.json');
+
+program
+    .version(packageJson.version)
+    .description(packageJson.description)
+    .usage('[options] <template ...>')
     .option(
         '-f, --file <json_file>',
-        'An input file to read the data from. Can be specified multiple times, and files will be ' +
+        'Input file to read the data from. Can be specified multiple times, and files will be ' +
         'merged together in the order they appear on the command line, with later files overwriting ' +
         'duplicate fields of earlier files.',
-        (val, memo) => { memo.push(val); return memo; },
+        function (val, memo) { memo.push(val); return memo; },
         []
     )
     .option(
@@ -22,9 +24,9 @@ program.version(packageJson.version)
         'Add environment variables to the @root object (accessible via @root.env)'
     )
     .option(
-        '-o, --option <name> <value>',
+        '-o, --opt <name> <value>',
         'Add an extra value to the @root object, as a string',
-        (name, value, obj) => { obj[name] = value; return obj; },
+        function (name, value, obj) { obj[name] = value; return obj; },
         {}
     )
     .option(
@@ -34,10 +36,10 @@ program.version(packageJson.version)
     .option(
         '-s, --strip [suffix]',
         'If an input template file ends in the given suffix, the output file will have that suffix stripped off. ' +
-        'For example, a suffix of \'hbs\' would turn file.html.hbs into \'file.html\'. This can be specified multiple' +
-        'times. If this parameter is specified with no argument, will default to stripping off \'.hbs\'',
-        (val, memo) => { memo.push(val); return memo; },
-        []
+        'For example, a suffix of \'hbs\' would turn file.html.hbs into \'file.html\'. Multiple entries can be specified, ' +
+        'separated by commas. If this parameter is specified with no argument, will default to stripping off \'.hbs\'',
+        function (val) { return val.split(','); },
+        ['.hbs']
     )
     .option(
         '-v, --verbose',
