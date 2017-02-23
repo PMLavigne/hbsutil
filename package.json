@@ -9,7 +9,7 @@
   "scripts": {
     "lint": "jshint --show-non-errors hbsutil.js",
     "preversion": "git checkout master && git pull && npm run lint",
-    "postversion": "git push && git push --tags && git checkout develop",
+    "postversion": "git push && git push --tags && npm publish && git checkout develop",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "git-tag-version": true,

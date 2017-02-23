@@ -260,7 +260,6 @@ function processTemplate(pathInfo, data) {
     log.debug(pathInfo.inName + '\t- Processed');
     fs.writeFileSync(pathInfo.outPath, processed);
     log.debug(pathInfo.inName + '\t- Written');
-
 }
 
 
