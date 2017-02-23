@@ -1,6 +1,6 @@
 {
   "name": "hbsutil",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Small command line utility for build-time processing of handlebars templates",
   "main": "hbsutil.js",
   "bin": {
