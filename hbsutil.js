@@ -7,6 +7,7 @@ var fs          = require('fs');
 var program     = require('commander');
 var log         = require('winston');
 var _           = require('underscore');
+var mkdirp      = require('mkdirp');
 
 var packageJson = require('./package.json');
 
@@ -49,8 +50,7 @@ function parseOptions() {
             'If an input template file ends in the given suffix, the output file will have that suffix stripped off. ' +
             'For example, a suffix of \'hbs\' would turn file.html.hbs into \'file.html\'. Multiple entries can be specified, ' +
             'separated by commas. If this parameter is specified with no argument, will default to stripping off \'.hbs\'',
-            function (val) { return val.split(','); },
-            ['.hbs']
+            function (val) { return val.split(','); }
         )
         .option(
             '-v, --verbose',
@@ -117,21 +117,69 @@ function compileData() {
         log.debug('Adding custom command line options to data...');
         _.extend(dataObj, program.opt);
     }
-
-    log.debug('Loaded data: ', dataObj);
     return dataObj;
 }
 
-function processTemplateList() {
+function processTemplateList(data) {
+    var stripFunc = function(path) { return path; };
 
+    if(program.strip) {
+        if (program.strip === true) {
+            program.strip = ['.hbs']
+        }
+        var regexStr = _.map(program.strip, function (suffix) {
+            return suffix.replace(/[\-\[\]\/{}()*+?.\\\^$|]/g, "\\$&");
+        }).join('|');
+
+        var regex = new RegExp('^(?:.*/)?([^/]+?)(?:' + regexStr + ')?$', 'i');
+        log.debug('Using regex ' + regex + ' to clean output path');
+        stripFunc = function(path) { return path.replace(regex, '$1'); };
+    }
+
+    var templates = _.map(program.args, function(arg) {
+        arg = arg.trim();
+
+        var outputFile = stripFunc(arg);
+        var outputPath;
+        if(program.outputDirectory) {
+            outputPath = program.outputDirectory + '/';
+        } else {
+            outputPath = arg.replace(/^(.*\/)[^\/]+$/, '$1');
+        }
+
+        try {
+            return {
+                file: arg,
+                outputPath: outputPath,
+                outputFile: outputFile,
+                contents: fs.readFileSync(arg)
+            };
+        } catch (err) {
+            log.error('Error reading template file ' + arg, err);
+            process.exit(2);
+        }
+    });
+
+    _.each(templates, function(template) {
+        processTemplate(template, data);
+    });
 }
 
-function processTemplate(templatePath, data, outputPath) {
-
+function processTemplate(template, data) {
+    log.info(template.file + ' -> ' + template.outputPath + template.outputFile);
+    try {
+        mkdirp.sync(template.outputPath);
+        fs.writeFileSync(template.outputPath + template.outputFile, hbs.compile(template.contents.toString())(data));
+    } catch (err) {
+        log.error('Error processing template ' + template.file, err);
+        process.exit(3);
+    }
 }
 
 
 parseOptions();
 configureLogging();
-var data = compileData();
+processTemplateList(compileData());
 
+log.info('Done.');
+process.exit(0);

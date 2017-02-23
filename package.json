@@ -1,6 +1,6 @@
 {
   "name": "hbsutil",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Small command line utility for build-time processing of handlebars templates",
   "main": "hbsutil.js",
   "scripts": {
@@ -26,6 +26,7 @@
   "dependencies": {
     "commander": "^2.9.0",
     "handlebars": "^4.0.6",
+    "mkdirp": "^0.5.1",
     "underscore": "^1.8.3",
     "winston": "^2.3.1"
   }
