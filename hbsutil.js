@@ -220,7 +220,7 @@ function getStripFunc() {
         return null;
     }
     var regexStr = _.map(program.strip, function (suffix) {
-        return suffix.replace(/[\-\[\]\/{}()*+?.\\\^$|]/g, "\\$&");
+        return suffix.replace(/[\-\[\]\/{}()*+?.\\\^$|]/g, '\\$&');
     }).join('|');
 
     var regex = new RegExp('(?:' + regexStr + ')$', 'i');
