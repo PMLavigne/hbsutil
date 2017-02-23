@@ -1,6 +1,6 @@
 {
   "name": "hbsutil",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Small command line utility for build-time processing of handlebars templates",
   "main": "hbsutil.js",
   "bin": {
@@ -9,7 +9,7 @@
   "scripts": {
     "lint": "jshint --show-non-errors hbsutil.js",
     "preversion": "git checkout master && git pull && npm run lint",
-    "postversion": "git push && git push --tags && npm publish && git checkout develop",
+    "postversion": "git push && git push --tags && npm publish && git checkout develop && git merge master && git push",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "git-tag-version": true,
