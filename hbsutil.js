@@ -1,6 +1,6 @@
 #! /usr/bin/env node
 /* eslint-disable no-param-reassign */
-"use strict";
+'use strict';
 
 var hbs         = require('handlebars');
 var fs          = require('fs');
@@ -8,6 +8,7 @@ var program     = require('commander');
 var log         = require('winston');
 var _           = require('underscore');
 var mkdirp      = require('mkdirp');
+var path        = require('path');
 
 var packageJson = require('./package.json');
 
@@ -42,7 +43,7 @@ function parseOptions() {
             {}
         )
         .option(
-            '-d, --output-directory <directory>',
+            '-d, --dir <directory>',
             'Directory to write the output file to. By default, will write to same directory as the input template'
         )
         .option(
@@ -53,18 +54,60 @@ function parseOptions() {
             function (val) { return val.split(','); }
         )
         .option(
+            '--force',
+            'Normally if we calculate that an output file will overwrite the input file that generated it, we refuse to ' +
+            'continue processing since this is almost certainly not what the user meant. Passing --force overrides this.'
+        )
+        .option(
             '-v, --verbose',
             'Print extra information about what we\'re doing'
         )
         .option(
             '-q, --quiet',
-            'Only print warnings and errors. -v will override this if both are specified'
+            'Only print errors. -v will override this if both are specified'
         )
         .parse(process.argv);
+
+    // Set up logging as soon as we can
+    configureLogging();
+
+    // Check to make sure we got args
+    if(!program.args || !program.args.length) {
+        log.error('At least one template file is required');
+        program.help();
+        process.exit(1);
+    }
+
+    // Set some programmatic defaults that commander doesn't handle - these are set to true when the user specifies a flag
+    // without giving the optional value for the flag, so we need to set a default
+    if (program.strip === true) {
+        program.strip = ['.hbs'];
+    }
+
+    if(program.env === true) {
+        program.env = 'env';
+    }
+
+    // Clean up program.dir just 'cuz
+    if(program.dir) {
+        var dirTrimmed = program.dir.trim();
+        if(!dirTrimmed.length) {
+            log.error('Invalid output directory specified: "' + program.dir + '"');
+            program.help();
+            process.exit(1);
+        }
+
+        // If path ends with a slash, trim it
+        if(dirTrimmed[dirTrimmed.length-1] === path.sep) {
+            dirTrimmed = dirTrimmed.substring(0, dirTrimmed.length-1);
+        }
+
+        program.dir = dirTrimmed;
+    }
 }
 
 function configureLogging() {
-    var logLevel = program.verbose ? 'debug' : program.quiet ? 'warn' : 'info';
+    var logLevel = program.verbose ? 'debug' : program.quiet ? 'error' : 'info';
 
     log.configure({
         level: logLevel,
@@ -105,9 +148,6 @@ function compileData() {
     }
 
     if(program.env) {
-        if(program.env === true) {
-            program.env = 'env';
-        }
         log.debug('Adding environment variables to data.' + program.env + '...');
         dataObj[program.env] = dataObj[program.env] || {};
         _.extend(dataObj[program.env], process.env);
@@ -120,65 +160,111 @@ function compileData() {
     return dataObj;
 }
 
-function processTemplateList(data) {
-    var stripFunc = function(path) { return path; };
-
-    if(program.strip) {
-        if (program.strip === true) {
-            program.strip = ['.hbs']
-        }
-        var regexStr = _.map(program.strip, function (suffix) {
-            return suffix.replace(/[\-\[\]\/{}()*+?.\\\^$|]/g, "\\$&");
-        }).join('|');
-
-        var regex = new RegExp('^(?:.*/)?([^/]+?)(?:' + regexStr + ')?$', 'i');
-        log.debug('Using regex ' + regex + ' to clean output path');
-        stripFunc = function(path) { return path.replace(regex, '$1'); };
+function canRead(path) {
+    try {
+        fs.accessSync(path, fs.constants.R_OK);
+        return true;
+    } catch (err) {
+        return false;
     }
-
-    var templates = _.map(program.args, function(arg) {
-        arg = arg.trim();
-
-        var outputFile = stripFunc(arg);
-        var outputPath;
-        if(program.outputDirectory) {
-            outputPath = program.outputDirectory + '/';
-        } else {
-            outputPath = arg.replace(/^(.*\/)[^\/]+$/, '$1');
-        }
-
-        try {
-            return {
-                file: arg,
-                outputPath: outputPath,
-                outputFile: outputFile,
-                contents: fs.readFileSync(arg)
-            };
-        } catch (err) {
-            log.error('Error reading template file ' + arg, err);
-            process.exit(2);
-        }
-    });
-
-    _.each(templates, function(template) {
-        processTemplate(template, data);
-    });
 }
 
-function processTemplate(template, data) {
-    log.info(template.file + ' -> ' + template.outputPath + template.outputFile);
-    try {
-        mkdirp.sync(template.outputPath);
-        fs.writeFileSync(template.outputPath + template.outputFile, hbs.compile(template.contents.toString())(data));
-    } catch (err) {
-        log.error('Error processing template ' + template.file, err);
-        process.exit(3);
+
+function parseTemplatePath(tplPath, stripFunc) {
+    if(!(tplPath || '').trim()) {
+        throw new Error('path is null or empty');
     }
+    var inPath = path.parse(tplPath);
+
+    if (!inPath) {
+        throw new Error('path.parse() returned null');
+    }
+
+    var outDir = program.dir ? program.dir : inPath.dir,
+        outFile = stripFunc ? stripFunc(inPath.base) : inPath.base;
+
+    var pathInfo = {
+        inDir: inPath.dir,
+        inName: inPath.base,
+        inPath: inPath.dir + path.sep + inPath.base,
+        outDir: outDir,
+        outName: outFile,
+        outPath: outDir + path.sep + outFile
+    };
+
+    if(!canRead(pathInfo.inPath)) {
+        throw new Error('Template "' + tplPath + '" doesn\'t exist or isn\'t accessible.');
+    }
+
+    if(!canRead(pathInfo.outDir)) {
+        log.debug('Creating output directory: ' + pathInfo.outDir);
+        mkdirp.sync(pathInfo.outDir);
+    }
+
+    if (pathInfo.inDir !== pathInfo.outDir || pathInfo.inName !== pathInfo.outName) {
+        return pathInfo;
+    }
+
+    if (!program.force) {
+        throw new Error('Template file "' + tplPath + '" will overwrite itself since its output path matches its ' +
+                        'input path. If you\'re SURE you want to do this, use --force');
+    }
+
+    log.warn('Template file "' + tplPath + '" will overwrite itself since its output path matches its ' +
+             'input. Continuing anyway since --force specified!');
+    return pathInfo;
+}
+
+function getStripFunc() {
+    if(!program.strip) {
+        return null;
+    }
+    var regexStr = _.map(program.strip, function (suffix) {
+        return suffix.replace(/[\-\[\]\/{}()*+?.\\\^$|]/g, "\\$&");
+    }).join('|');
+
+    var regex = new RegExp('(?:' + regexStr + ')$', 'i');
+    log.debug('Using regex ' + regex + ' to strip template file suffix');
+    return function(path) { return path.replace(regex, ''); };
+}
+
+function processTemplateList(data) {
+    var stripFunc = getStripFunc();
+
+    _.chain(program.args)
+        .map(function(arg) {
+            try {
+                return parseTemplatePath(arg, stripFunc);
+            } catch (err) {
+                log.error('Failure while preprocessing template "' + arg + '"', err);
+                process.exit(1);
+            }
+        })
+        .each(function(pathInfo) {
+            try {
+                processTemplate(pathInfo, data);
+            } catch (err) {
+                log.error('Error while processing template ' + pathInfo.file, err);
+                process.exit(1);
+            }
+        });
+}
+
+function processTemplate(pathInfo, data) {
+    log.info(pathInfo.inPath + '\t⇨ ' + pathInfo.outPath);
+    var templateText = fs.readFileSync(pathInfo.inPath).toString();
+    log.debug(pathInfo.inName + '\t- Loaded');
+    var template = hbs.compile(templateText);
+    log.debug(pathInfo.inName  + '\t- Compiled');
+    var processed = template(data);
+    log.debug(pathInfo.inName + '\t- Processed');
+    fs.writeFileSync(pathInfo.outPath, processed);
+    log.debug(pathInfo.inName + '\t- Written');
+
 }
 
 
 parseOptions();
-configureLogging();
 processTemplateList(compileData());
 
 log.info('Done.');
